@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 
 function formatDate(date: string) {
@@ -9,11 +10,52 @@ function formatDate(date: string) {
   });
 }
 
-export default async function ReportsPage() {
-  const { data: reports } = await getSupabaseAdmin()
-    .from('weekly_reports')
-    .select('*')
-    .order('week_start', { ascending: false });
+export default function ReportsPageWrapper() {
+  // Use a client component for the button and feedback
+  return <ReportsPageClient />;
+}
+
+function ReportsPageClient() {
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [_, startTransition] = useTransition();
+
+  // Fetch reports on mount
+  React.useEffect(() => {
+    fetchReports();
+  }, []);
+
+  async function fetchReports() {
+    const res = await fetch('/api/reports');
+    if (res.ok) {
+      const data = await res.json();
+      setReports(data.reports || data || []);
+    }
+  }
+
+  async function handleGenerateReport() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/weekly-review', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || ''}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage('✅ Report generated!');
+        fetchReports();
+      } else {
+        setMessage(data?.error || 'Failed to generate report.');
+      }
+    } catch (e) {
+      setMessage('Failed to generate report.');
+    }
+    setLoading(false);
+  }
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
@@ -28,6 +70,17 @@ export default async function ReportsPage() {
           <Link href="/entries" className="text-gray-400 hover:text-white">Entries</Link>
           <Link href="/reports" className="text-white font-semibold">Reports</Link>
         </nav>
+
+        <div className="mb-8 flex flex-col items-center">
+          <button
+            onClick={handleGenerateReport}
+            disabled={loading}
+            className="px-6 py-2 rounded bg-amber-500 text-black font-bold hover:bg-amber-400 disabled:opacity-50"
+          >
+            {loading ? 'Generating...' : 'Generate Report Now'}
+          </button>
+          {message && <div className="mt-2 text-sm text-amber-300">{message}</div>}
+        </div>
 
         {!reports || reports.length === 0 ? (
           <div className="text-center py-12 p-6 bg-zinc-900 border border-zinc-800 rounded-lg">
