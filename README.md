@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Weekly Reflection System
 
-## Getting Started
+A brutally honest weekly reflection system that acts as a personal Board of Directors to catch avoidance patterns and issue executable strategy.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Telegram bot for logging wins, problems, money matters, and avoidance behaviors
+- Weekly automated summaries using Gemini AI
+- Dashboard for viewing entries and reports
+- Supabase for data storage and cron jobs
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up Supabase:
+   - Create a new project
+   - Run the SQL to create tables:
+     ```sql
+     CREATE TABLE entries (
+       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+       created_at timestamptz DEFAULT now(),
+       type text NOT NULL,
+       content text NOT NULL
+     );
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+     CREATE TABLE weekly_reports (
+       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+       week_start date NOT NULL,
+       summary text,
+       patterns text,
+       strategy text,
+       drop_list text,
+       created_at timestamptz DEFAULT now()
+     );
+     ```
+   - Enable RLS if needed (for v1, public)
+4. Set up environment variables in `.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_key
+   GEMINI_API_KEY=your_gemini_key
+   TELEGRAM_BOT_TOKEN=your_bot_token
+   NEXT_PUBLIC_VERCEL_URL=http://localhost:3000
+   ```
+5. Set up Telegram bot:
+   - Create bot with BotFather
+   - Set webhook: `https://api.telegram.org/bot<token>/setWebhook?url=https://your-app.vercel.app/api/telegram`
+6. Run development server: `npm run dev`
 
-## Learn More
+## Deployment
 
-To learn more about Next.js, take a look at the following resources:
+Deploy to Vercel. Set up Supabase cron for weekly reviews.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Send messages to Telegram bot: `/win Your win`, `/problem Issue`, etc.
+- View dashboard at home page
+- Check entries and reports in respective sections
