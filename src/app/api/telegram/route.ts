@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { generateEntryResponse } from '@/lib/gemini';
 
 export const runtime = "edge";
 
@@ -62,10 +63,19 @@ export async function POST(req: Request) {
       await sendTelegramMessage(chatId, '❌ Failed to save entry. Please try again.');
     } else {
       console.log('Saved entry:', data);
-      await sendTelegramMessage(
-        chatId,
-        `✅ Logged *${entry.type}*: ${entry.content.substring(0, 100)}${entry.content.length > 100 ? '...' : ''}`
-      );
+      
+      // Generate AI response
+      try {
+        const aiResponse = await generateEntryResponse(entry.type, entry.content);
+        await sendTelegramMessage(chatId, `✅ Logged.\n\n${aiResponse}`);
+      } catch (aiError) {
+        console.error('Gemini error:', aiError);
+        // Fallback to simple confirmation
+        await sendTelegramMessage(
+          chatId,
+          `✅ Logged *${entry.type}*: ${entry.content.substring(0, 100)}${entry.content.length > 100 ? '...' : ''}`
+        );
+      }
     }
 
     return new Response("OK", { status: 200 });

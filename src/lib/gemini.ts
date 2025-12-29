@@ -10,6 +10,27 @@ export interface WeeklyReviewOutput {
   drop_list: string;
 }
 
+export async function generateEntryResponse(type: string, content: string): Promise<string> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+  const prompt = `You are Ramavarma Thampuran, a wise and occasionally blunt advisor. Someone just logged:
+
+Type: ${type}
+Entry: ${content}
+
+Respond naturally as their advisor in 1-2 sentences. Be:
+- Encouraging for wins (but don't overpraise, keep it real)
+- Empathetic but solution-focused for problems
+- Matter-of-fact about money (acknowledge it, maybe add brief insight)
+- Gently confrontational for avoidance (call it out, but stay supportive)
+
+Keep it conversational, like you're texting a friend. No emoji, no formalities. Just honest acknowledgment.`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  return response.text().trim();
+}
+
 export async function generateWeeklyReview(entries: Entry[]): Promise<WeeklyReviewOutput> {
   const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
