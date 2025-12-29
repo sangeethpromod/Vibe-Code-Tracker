@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import Link from 'next/link';
 
 function formatDate(date: string) {
@@ -10,7 +10,7 @@ function formatDate(date: string) {
 }
 
 export default async function ReportsPage() {
-  const { data: reports } = await supabaseAdmin
+  const { data: reports } = await getSupabaseAdmin()
     .from('weekly_reports')
     .select('*')
     .order('week_start', { ascending: false });

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -19,7 +19,7 @@ function getNextSunday() {
 
 export default async function Home() {
   // Fetch latest report
-  const { data: reports } = await supabaseAdmin
+  const { data: reports } = await getSupabaseAdmin()
     .from('weekly_reports')
     .select('*')
     .order('week_start', { ascending: false })
@@ -31,7 +31,7 @@ export default async function Home() {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const { data: entries } = await supabaseAdmin
+  const { data: entries } = await getSupabaseAdmin()
     .from('entries')
     .select('id, type')
     .gte('created_at', sevenDaysAgo.toISOString());

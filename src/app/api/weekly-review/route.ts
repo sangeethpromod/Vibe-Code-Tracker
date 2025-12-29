@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { generateWeeklyReview } from '@/lib/gemini';
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data: entries, error: fetchError } = await supabaseAdmin
+    const { data: entries, error: fetchError } = await getSupabaseAdmin()
       .from('entries')
       .select('*')
       .gte('created_at', sevenDaysAgo.toISOString())
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Save to database
     const weekStart = getWeekStart(new Date());
-    const { data: report, error: saveError } = await supabaseAdmin
+    const { data: report, error: saveError } = await getSupabaseAdmin()
       .from('weekly_reports')
       .insert({
         week_start: weekStart,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { CreateEntrySchema } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const { type, content } = validation.data;
 
     // Insert into Supabase
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('entries')
       .insert({
         type,
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('entries')
       .select('*')
       .order('created_at', { ascending: false })
