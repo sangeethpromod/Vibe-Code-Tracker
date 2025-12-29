@@ -49,7 +49,7 @@ SELECT cron.schedule(
   '0 20 * * 0',
   $$
   SELECT net.http_post(
-    url := 'https://your-app.vercel.app/api/weekly-review',
+    url := 'https://ramavarma-thampuran-ai.vercel.app/api/weekly-review',
     headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SECRET_KEY"}'::jsonb,
     body := '{}'::jsonb
   ) AS request_id;
