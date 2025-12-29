@@ -1,17 +1,24 @@
 {
-  "name": "weekly-reflection-system",
-  "version": "0.1.0",
+  "name": "vibe-code-tracker",
+  "version": "1.0.0",
+  "description": "Brutally honest weekly reflection system",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test-setup": "powershell -ExecutionPolicy Bypass -File ./test-setup.ps1"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
     "next": "16.1.1",
+    "node-telegram-bot-api": "^0.67.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

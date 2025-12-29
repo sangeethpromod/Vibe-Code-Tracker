@@ -1,53 +1,70 @@
-# Weekly Reflection System
+# Vibe Code Tracker
 
-A brutally honest weekly reflection system that acts as a personal Board of Directors to catch avoidance patterns and issue executable strategy.
+A brutally honest weekly reflection system. Not a journal—a personal Board of Directors that catches avoidance patterns and issues executable strategy.
 
-## Features
+## Quick Start
 
-- Telegram bot for logging wins, problems, money matters, and avoidance behaviors
-- Weekly automated summaries using Gemini AI
-- Dashboard for viewing entries and reports
-- Supabase for data storage and cron jobs
-
-## Setup
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Set up Supabase:
-   - Create a new project
-   - Run the SQL to create tables:
-     ```sql
-     CREATE TABLE entries (
-       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-       created_at timestamptz DEFAULT now(),
-       type text NOT NULL,
-       content text NOT NULL
-     );
-
-     CREATE TABLE weekly_reports (
-       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-       week_start date NOT NULL,
-       summary text,
-       patterns text,
-       strategy text,
-       drop_list text,
-       created_at timestamptz DEFAULT now()
-     );
-     ```
-   - Enable RLS if needed (for v1, public)
-4. Set up environment variables in `.env.local`:
+1. **Clone and install**
+   ```bash
+   npm install
    ```
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_key
-   GEMINI_API_KEY=your_gemini_key
-   TELEGRAM_BOT_TOKEN=your_bot_token
-   NEXT_PUBLIC_VERCEL_URL=http://localhost:3000
+
+2. **Set up Supabase**
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Run the SQL in `supabase/schema.sql` in the SQL Editor
+   - Copy your project URL and keys
+
+3. **Configure environment**
+   - Copy `.env.local.example` to `.env.local`
+   - Fill in all the values:
+     - Supabase URL and keys
+     - Gemini API key (get from [ai.google.dev](https://ai.google.dev))
+     - Telegram bot token (get from [@BotFather](https://t.me/botfather))
+     - Generate a random CRON_SECRET
+
+4. **Run locally**
+   ```bash
+   npm run dev
    ```
-5. Set up Telegram bot:
-   - Create bot with BotFather
-   - Set webhook: `https://api.telegram.org/bot<token>/setWebhook?url=https://your-app.vercel.app/api/telegram`
-6. Run development server: `npm run dev`
+
+5. **Set up Telegram bot**
+   - Create bot with @BotFather
+   - Set webhook: `https://your-app.vercel.app/api/telegram`
+   - Or use long polling for local testing
+
+6. **Deploy to Vercel**
+   ```bash
+   vercel
+   ```
+   - Add all env variables in Vercel dashboard
+   - Update the cron job URL in Supabase to your Vercel domain
+
+## Usage
+
+### Logging via Telegram
+Send messages to your bot:
+- `win: Closed the deal with client X`
+- `problem: Can't focus on deep work`
+- `money: +5000 from project`
+- `avoidance: Scrolling instead of coding`
+
+### Dashboard
+- `/` - Home dashboard with latest summary
+- `/entries` - All logged entries with filters
+- `/reports` - Past weekly reviews
+
+### Manual Review
+POST to `/api/weekly-review` with Authorization header to trigger manual review.
+
+## Stack
+- Next.js 15 (App Router)
+- Supabase (Postgres + Auth + Cron)
+- Gemini API (summary generation)
+- Telegram Bot API
+- Vercel (deployment)
+
+## Philosophy
+This system exists to surface uncomfortable truths and force action. It's a tool, not a product demo.
 
 ## Deployment
 
