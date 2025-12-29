@@ -35,13 +35,18 @@ function getWeekStart(date: Date): string {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authorization
-    const authHeader = request.headers.get('authorization');
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const url = new URL(request.url);
+    const isManual = url.searchParams.get('manual') === 'true';
+
+    // Verify authorization (skip for manual requests)
+    if (!isManual) {
+      const authHeader = request.headers.get('authorization');
+      if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
     }
 
     // Get last 7 days of entries

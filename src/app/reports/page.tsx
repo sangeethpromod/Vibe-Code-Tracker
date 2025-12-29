@@ -1,5 +1,6 @@
-import { getSupabaseAdmin } from '@/lib/supabase';
-import { useState, useTransition } from 'react';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 function formatDate(date: string) {
@@ -19,10 +20,9 @@ function ReportsPageClient() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [_, startTransition] = useTransition();
 
   // Fetch reports on mount
-  React.useEffect(() => {
+  useEffect(() => {
     fetchReports();
   }, []);
 
@@ -38,11 +38,8 @@ function ReportsPageClient() {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/weekly-review', {
+      const res = await fetch('/api/weekly-review?manual=true', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || ''}`,
-        },
       });
       const data = await res.json();
       if (res.ok) {
