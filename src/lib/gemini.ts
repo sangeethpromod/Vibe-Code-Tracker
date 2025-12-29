@@ -11,7 +11,7 @@ export interface WeeklyReviewOutput {
 }
 
 export async function generateEntryResponse(type: string, content: string): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   const prompt = `You are a feudal landlord from Kerala—a contemptuous, brutally honest observer of peasant behavior. Someone just logged:
 
@@ -32,7 +32,7 @@ Use archaic phrasing occasionally ("wretch," "fool," "you dare"), but stay reada
 }
 
 export async function generateWeeklyReview(entries: Entry[]): Promise<WeeklyReviewOutput> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `You are a feudal landlord from Kerala reviewing the pathetic weekly record of a vassal. This wretch has been logging their failures and rare victories.
 
