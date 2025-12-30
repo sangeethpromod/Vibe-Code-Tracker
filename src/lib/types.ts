@@ -1,7 +1,14 @@
 import { z } from 'zod';
 
 // Entry types
-export const EntryType = z.enum(['win', 'problem', 'money', 'avoidance']);
+export const EntryType = z.enum([
+  'win', 'problem', 'money', 'avoidance',
+  'energy', 'mood', 'sleep',
+  'workout', 'food', 'substance',
+  'connection', 'conflict',
+  'focus', 'distraction', 'procrastination',
+  'learn', 'insight'
+]);
 export type EntryType = z.infer<typeof EntryType>;
 
 // Request validation schemas

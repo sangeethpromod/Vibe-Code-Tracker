@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { WeeklyReport } from '@/lib/supabase';
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('en-US', {
@@ -17,14 +18,9 @@ export default function ReportsPageWrapper() {
 }
 
 function ReportsPageClient() {
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  // Fetch reports on mount
-  useEffect(() => {
-    fetchReports();
-  }, []);
 
   async function fetchReports() {
     const res = await fetch('/api/reports');
@@ -33,6 +29,12 @@ function ReportsPageClient() {
       setReports(data.reports || data || []);
     }
   }
+
+  // Fetch reports on mount
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchReports();
+  }, []);
 
   async function handleGenerateReport() {
     setLoading(true);

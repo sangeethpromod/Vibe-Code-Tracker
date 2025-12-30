@@ -34,6 +34,26 @@ Use archaic phrasing occasionally ("wretch," "fool," "you dare"), but stay reada
 export async function generateWeeklyReview(entries: Entry[]): Promise<WeeklyReviewOutput> {
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
+  const categorized = {
+    wins: entries.filter(e => e.type === 'win'),
+    problems: entries.filter(e => e.type === 'problem'),
+    money: entries.filter(e => e.type === 'money'),
+    avoidance: entries.filter(e => e.type === 'avoidance'),
+    energy: entries.filter(e => e.type === 'energy'),
+    mood: entries.filter(e => e.type === 'mood'),
+    sleep: entries.filter(e => e.type === 'sleep'),
+    workout: entries.filter(e => e.type === 'workout'),
+    food: entries.filter(e => e.type === 'food'),
+    substance: entries.filter(e => e.type === 'substance'),
+    connection: entries.filter(e => e.type === 'connection'),
+    conflict: entries.filter(e => e.type === 'conflict'),
+    focus: entries.filter(e => e.type === 'focus'),
+    distraction: entries.filter(e => e.type === 'distraction'),
+    procrastination: entries.filter(e => e.type === 'procrastination'),
+    learn: entries.filter(e => e.type === 'learn'),
+    insight: entries.filter(e => e.type === 'insight')
+  };
+
   const prompt = `You are a feudal landlord from Kerala reviewing the pathetic weekly record of a vassal. This wretch has been logging their failures and rare victories.
 
 Your task: Deliver a scathing, contemptuous assessment. Be brutal but precise—this isn't generic insult, it's specific diagnosis of their incompetence.
@@ -50,8 +70,40 @@ Provide:
 
 Use archaic language sparingly ("wretch," "fool," "you dare waste"), but remain clear. The contempt should come from the content and observations, not from being difficult to read. You are disappointed, not theatrical.
 
-Entries from this week:
-${JSON.stringify(entries.map(e => ({ type: e.type, content: e.content, date: e.created_at })), null, 2)}
+WINS (${categorized.wins.length}):
+${formatEntries(categorized.wins)}
+
+PROBLEMS (${categorized.problems.length}):
+${formatEntries(categorized.problems)}
+
+MONEY WASTE (${categorized.money.length}):
+${formatEntries(categorized.money)}
+
+AVOIDANCE (${categorized.avoidance.length}):
+${formatEntries(categorized.avoidance)}
+
+ENERGY LEVELS (${categorized.energy.length}):
+${formatEntries(categorized.energy)}
+
+SLEEP (${categorized.sleep.length}):
+${formatEntries(categorized.sleep)}
+
+WORKOUTS (${categorized.workout.length}):
+${formatEntries(categorized.workout)}
+
+FOCUS/DISTRACTION (${categorized.focus.length + categorized.distraction.length}):
+Focus: ${formatEntries(categorized.focus)}
+Distraction: ${formatEntries(categorized.distraction)}
+
+CONNECTIONS/CONFLICTS (${categorized.connection.length + categorized.conflict.length}):
+Connection: ${formatEntries(categorized.connection)}
+Conflict: ${formatEntries(categorized.conflict)}
+
+LEARNING (${categorized.learn.length}):
+${formatEntries(categorized.learn)}
+
+INSIGHTS (${categorized.insight.length}):
+${formatEntries(categorized.insight)}
 
 Respond in this exact JSON format (keep the contemptuous tone within the strings):
 {
@@ -78,4 +130,9 @@ Respond in this exact JSON format (keep the contemptuous tone within the strings
     console.error('Failed to parse Gemini response:', error);
     throw new Error('Failed to generate structured review');
   }
+}
+
+function formatEntries(entries: Entry[]): string {
+  if (entries.length === 0) return '(None - pathetic)';
+  return entries.map(e => `- ${e.content}`).join('\n');
 }

@@ -22,8 +22,9 @@ export const getSupabase = () => createClient(
 export interface Entry {
   id: string;
   created_at: string;
-  type: 'win' | 'problem' | 'money' | 'avoidance';
+  type: 'win' | 'problem' | 'money' | 'avoidance' | 'energy' | 'mood' | 'sleep' | 'workout' | 'food' | 'substance' | 'connection' | 'conflict' | 'focus' | 'distraction' | 'procrastination' | 'learn' | 'insight';
   content: string;
+  metadata?: Record<string, unknown>;
   user_id?: string;
 }
 

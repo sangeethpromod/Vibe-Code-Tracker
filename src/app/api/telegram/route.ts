@@ -1,9 +1,26 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { generateEntryResponse } from '@/lib/gemini';
+import { parseEntry } from '@/lib/telegram-parser';
 
 export const runtime = "edge";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+
+type ConversationState =
+  | 'idle'
+  | 'awaiting_checkin_energy'
+  | 'awaiting_checkin_win'
+  | 'awaiting_checkin_avoided'
+  | 'awaiting_checkin_mood'
+  | 'awaiting_checkin_grateful';
+
+interface TelegramMessage {
+  message: {
+    chat: { id: number };
+    text: string;
+  };
+}
 
 async function sendTelegramMessage(chatId: number, text: string) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -18,69 +35,150 @@ async function sendTelegramMessage(chatId: number, text: string) {
   });
 }
 
-function parseEntry(text: string): { type: string; content: string } | null {
-  const match = text.match(/^(win|problem|money|avoidance):\s*(.+)/i);
-  if (!match) return null;
-  return {
-    type: match[1].toLowerCase(),
-    content: match[2].trim(),
-  };
+async function saveEntry(entry: { type: string; content: string; metadata?: Record<string, unknown> }) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('entries')
+    .insert({
+      type: entry.type,
+      content: entry.content,
+      metadata: entry.metadata || {},
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw error;
+  }
+
+  return data;
 }
 
-export async function POST(req: Request) {
-  try {
-    const update = await req.json();
-    console.log("TELEGRAM UPDATE:", update);
+export async function POST(req: NextRequest) {
+  const body: TelegramMessage = await req.json();
+  const chatId = body.message.chat.id;
+  const text = body.message.text?.trim();
 
-    const message = update?.message;
-    if (!message?.text) {
-      return new Response("OK", { status: 200 });
-    }
+  if (!text) return NextResponse.json({ ok: true });
 
-    const chatId = message.chat.id;
-    const entry = parseEntry(message.text);
+  const supabase = getSupabaseAdmin();
 
-    if (!entry) {
-      await sendTelegramMessage(
-        chatId,
-        'Invalid format. Use:\n\n`win: your achievement`\n`problem: the issue`\n`money: financial note`\n`avoidance: what you avoided`'
-      );
-      return new Response("OK", { status: 200 });
-    }
+  // Get conversation state
+  const { data: stateData } = await supabase
+    .from('conversation_state')
+    .select('*')
+    .eq('chat_id', chatId)
+    .single();
 
-    // Save to Supabase
-    const { data, error } = await getSupabaseAdmin()
-      .from('entries')
-      .insert({
-        type: entry.type,
-        content: entry.content,
-      })
-      .select()
-      .single();
+  const currentState: ConversationState = stateData?.state || 'idle';
+  const stateDataObj = stateData?.data || {};
 
-    if (error) {
-      console.error('Supabase error:', error);
-      await sendTelegramMessage(chatId, '❌ Failed to save entry. Please try again.');
-    } else {
-      console.log('Saved entry:', data);
-      
-      // Generate AI response
-      try {
-        const aiResponse = await generateEntryResponse(entry.type, entry.content);
-        await sendTelegramMessage(chatId, `✅ Logged.\n\n${aiResponse}`);
-      } catch (aiError) {
-        console.error('Gemini error:', aiError);
-        // Fallback to simple confirmation
-        await sendTelegramMessage(
-          chatId,
-          `✅ Logged *${entry.type}*: ${entry.content.substring(0, 100)}${entry.content.length > 100 ? '...' : ''}`
-        );
-      }
-    }
-
-    return new Response("OK", { status: 200 });
-  } catch (err) {
-    console.error("ERROR:", err);
-    return new Response("OK", { status: 200 });
+  // Handle /checkin command
+  if (text.toLowerCase() === '/checkin' && currentState === 'idle') {
+    await updateConversationState(supabase, chatId, 'awaiting_checkin_energy', {});
+    await sendTelegramMessage(chatId,
+      "Quick check-in:\n\n1️⃣ Energy level today (1-10)?"
+    );
+    return NextResponse.json({ ok: true });
   }
+
+  // Handle check-in flow
+  if (currentState !== 'idle') {
+    return await handleCheckinFlow(supabase, chatId, text, currentState, stateDataObj);
+  }
+
+  // Normal entry logging
+  const entry = parseEntry(text);
+  await saveEntry(entry);
+
+  const response = await generateEntryResponse(entry.type, entry.content);
+  await sendTelegramMessage(chatId, response);
+
+  return NextResponse.json({ ok: true });
+}
+
+async function handleCheckinFlow(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  chatId: number,
+  text: string,
+  state: ConversationState,
+  data: Record<string, unknown>
+) {
+  switch (state) {
+    case 'awaiting_checkin_energy':
+      const energy = parseInt(text);
+      if (isNaN(energy) || energy < 1 || energy > 10) {
+        await sendTelegramMessage(chatId, "Please enter a number between 1-10:");
+        return NextResponse.json({ ok: true });
+      }
+      await updateConversationState(supabase, chatId, 'awaiting_checkin_win', { ...data, energy });
+      await sendTelegramMessage(chatId, "2️⃣ One win today?");
+      break;
+
+    case 'awaiting_checkin_win':
+      await updateConversationState(supabase, chatId, 'awaiting_checkin_avoided', { ...data, win: text });
+      await sendTelegramMessage(chatId, "3️⃣ What did you avoid today?");
+      break;
+
+    case 'awaiting_checkin_avoided':
+      await updateConversationState(supabase, chatId, 'awaiting_checkin_mood', { ...data, avoided: text });
+      await sendTelegramMessage(chatId, "4️⃣ Current mood (one word)?");
+      break;
+
+    case 'awaiting_checkin_mood':
+      await updateConversationState(supabase, chatId, 'awaiting_checkin_grateful', { ...data, mood: text });
+      await sendTelegramMessage(chatId, "5️⃣ What are you grateful for today?");
+      break;
+
+    case 'awaiting_checkin_grateful':
+      // Save complete check-in
+      const checkinData: { energy: number; win: string; avoided: string; mood: string; grateful: string } = {
+        energy: data.energy as number,
+        win: data.win as string,
+        avoided: data.avoided as string,
+        mood: data.mood as string,
+        grateful: text
+      };
+      await saveCheckin(supabase, checkinData);
+
+      await updateConversationState(supabase, chatId, 'idle', {});
+      await sendTelegramMessage(chatId,
+        `✅ Check-in complete!\n\n` +
+        `Energy: ${checkinData.energy}/10\n` +
+        `Win: ${checkinData.win}\n` +
+        `Avoided: ${checkinData.avoided}\n` +
+        `Mood: ${checkinData.mood}\n` +
+        `Grateful: ${checkinData.grateful}`
+      );
+      break;
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+async function updateConversationState(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  chatId: number,
+  state: ConversationState,
+  data: Record<string, unknown>
+) {
+  await supabase
+    .from('conversation_state')
+    .upsert({
+      chat_id: chatId,
+      state,
+      data,
+      updated_at: new Date().toISOString()
+    });
+}
+
+async function saveCheckin(supabase: ReturnType<typeof getSupabaseAdmin>, data: Record<string, unknown>) {
+  await supabase.from('checkins').insert({
+    energy_score: data.energy,
+    win_today: data.win,
+    avoided_today: data.avoided,
+    mood: data.mood,
+    grateful_for: data.grateful
+  });
 }
