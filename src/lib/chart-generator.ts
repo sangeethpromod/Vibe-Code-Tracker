@@ -1,3 +1,10 @@
+// app/lib/chart-generator.ts
+
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getSupabaseAdmin } from './supabase';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
 // Rate limiting configuration
 const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests (30 requests per minute max)
 const MAX_RETRIES = 3;
@@ -30,7 +37,8 @@ async function retryWithBackoff<T>(
       }
 
       // Extract retry delay from error if available, otherwise use exponential backoff
-      const retryDelay = error?.errorDetails?.find((detail: any) =>
+      const errorDetails = (error as any)?.errorDetails;
+      const retryDelay = errorDetails?.find((detail: any) =>
         detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
       )?.retryDelay || `${baseDelay * Math.pow(2, attempt)}ms`;
 
