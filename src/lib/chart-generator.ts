@@ -53,7 +53,7 @@ export async function generateChartData(chartType: string): Promise<any> {
   // Get raw data based on chart type
   const rawData = await getChartRawData(chartType, supabase);
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   const prompts = {
     entry_volume: `Analyze this entry data and generate a line chart showing entry volume over time.
