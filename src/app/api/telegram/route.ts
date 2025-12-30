@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { generateEntryResponse } from '@/lib/gemini';
+import { generateEntryResponse, generateFeudalResponse } from '@/lib/gemini';
 import { parseEntry } from '@/lib/telegram-parser';
 
 export const runtime = "edge";
@@ -88,12 +88,20 @@ export async function POST(req: NextRequest) {
     return await handleCheckinFlow(supabase, chatId, text, currentState, stateDataObj);
   }
 
-  // Normal entry logging
-  const entry = parseEntry(text);
-  await saveEntry(entry);
+  // Check if this looks like an entry (contains a colon for type:content format)
+  const isEntryFormat = text.includes(':') && text.split(':')[0].trim().length > 0;
 
-  const response = await generateEntryResponse(entry.type, entry.content);
-  await sendTelegramMessage(chatId, response);
+  if (isEntryFormat) {
+    // Parse and save as entry
+    const entry = parseEntry(text);
+    await saveEntry(entry);
+    const response = await generateEntryResponse(entry.type, entry.content);
+    await sendTelegramMessage(chatId, response);
+  } else {
+    // Treat as general conversation and respond as feudal lord
+    const response = await generateFeudalResponse(text);
+    await sendTelegramMessage(chatId, response);
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -5,13 +5,14 @@ import { getSupabaseAdmin } from './supabase';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateChartData(chartType: string): Promise<any> {
   const supabase = getSupabaseAdmin();
 
   // Get raw data based on chart type
   const rawData = await getChartRawData(chartType, supabase);
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompts = {
     entry_volume: `Analyze this entry data and generate a line chart showing entry volume over time.
@@ -240,6 +241,7 @@ Return JSON in this exact format:
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getChartRawData(chartType: string, supabase: any): Promise<any> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

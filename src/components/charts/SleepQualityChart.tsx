@@ -46,6 +46,7 @@ export default function SleepQualityChart({ data }: SleepQualityChartProps) {
             color: '#F3F4F6'
           }}
           labelFormatter={(value) => new Date(value).toLocaleDateString()}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(value: number | undefined, name: string | undefined, props: any) => [
             `${value || 0} hours (${props.payload.quality}, ${props.payload.interruptions} interruptions)`,
             'Sleep'

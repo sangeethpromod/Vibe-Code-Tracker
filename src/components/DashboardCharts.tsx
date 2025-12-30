@@ -17,6 +17,7 @@ const FinancialTrackingChart = dynamic(() => import('./charts/FinancialTrackingC
 const LoggingConsistencyChart = dynamic(() => import('./charts/LoggingConsistencyChart'), { ssr: false });
 
 interface ChartData {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[];
   insights: string[];
   cached?: boolean;
