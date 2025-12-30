@@ -11,7 +11,7 @@ export interface WeeklyReviewOutput {
 }
 
 export async function generateEntryResponse(type: string, content: string): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
  const prompt = `
 You are a Kerala feudal landlord (janmi) from 1980s Thrissur—rich, feared, and permanently disappointed in everyone around you. 
@@ -51,7 +51,7 @@ END.
 }
 
 export async function generateFeudalResponse(message: string): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
   const prompt = `You are a feudal landlord from Kerala—arrogant, witty, and brutally honest. Someone just messaged you: "${message}"
 
@@ -72,7 +72,7 @@ Keep responses conversational and engaging, not just judgmental. This lord enjoy
 }
 
 export async function generateWeeklyReview(entries: Entry[]): Promise<WeeklyReviewOutput> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
   const categorized = {
     wins: entries.filter(e => e.type === 'win'),
