@@ -30,8 +30,78 @@ export default function DashboardCharts() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [rateLimitWarning, setRateLimitWarning] = useState<string | null>(null);
+
+  // Helper component for no data state
+  const NoDataState = ({ emoji = "📊" }: { emoji?: string }) => (
+    <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+      <span className="text-2xl mb-2">{emoji}</span>
+      <p className="text-sm text-center">No chart data available</p>
+      <p className="text-xs text-center mt-1">Click "Refresh Charts" to generate</p>
+    </div>
+  );
+
+  // Helper component for chart status badge
+  const StatusBadge = ({ cached }: { cached?: boolean }) => {
+    if (cached === undefined) return null;
+    return (
+      <span className={`text-xs px-2 py-1 rounded ${
+        cached ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
+      }`}>
+        {cached ? 'Cached' : 'No Data'}
+      </span>
+    );
+  };
 
   const fetchAllCharts = async (forceRefresh = false) => {
+    setRateLimitWarning(null); // Clear any previous warnings
+
+    if (forceRefresh) {
+      // Use bulk generation endpoint for refresh to respect rate limits
+      try {
+        console.log('Starting bulk chart refresh...');
+        const response = await fetch('/api/chart-data/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period: 'weekly' })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 429 || errorData.error?.includes('429') || errorData.error?.includes('Too Many Requests')) {
+            setRateLimitWarning('Rate limit exceeded. Charts will be generated sequentially. Please wait...');
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+          console.log('Bulk refresh completed:', result.message);
+          setChartsData(result.results);
+        } else {
+          console.error('Bulk refresh failed:', result.message);
+          // Fall back to individual fetches if bulk fails
+          await fetchIndividualCharts(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Bulk refresh failed, falling back to individual fetches:', error);
+        // Fall back to individual fetches if bulk fails
+        await fetchIndividualCharts(false);
+        return;
+      }
+    } else {
+      // Use individual cached fetches for normal loading
+      await fetchIndividualCharts(true);
+    }
+
+    setLastUpdated(new Date().toLocaleString());
+    setLoading(false);
+    setRefreshing(false);
+  };
+
+  const fetchIndividualCharts = async (useCache = true) => {
     const chartTypes = [
       'entry_volume',
       'energy_timeline',
@@ -48,15 +118,15 @@ export default function DashboardCharts() {
 
     const chartPromises = chartTypes.map(async (type) => {
       try {
-        const url = forceRefresh
-          ? `/api/chart-data/generate?type=${type}&period=weekly`
-          : `/api/chart-data?type=${type}&period=weekly`;
+        const url = useCache
+          ? `/api/chart-data?type=${type}&period=weekly`  // Cache-only, no Gemini API
+          : `/api/chart-data/generate?type=${type}&period=weekly`;  // Generate with Gemini API
         const response = await fetch(url);
         const data = await response.json();
         return { type, data };
       } catch (error) {
         console.error(`Failed to fetch ${type} chart:`, error);
-        return { type, data: { data: [], insights: [], message: 'Failed to load' } };
+        return { type, data: { data: [], insights: [], message: 'Failed to load', cached: false } };
       }
     });
 
@@ -68,9 +138,6 @@ export default function DashboardCharts() {
     });
 
     setChartsData(chartDataMap);
-    setLastUpdated(new Date().toLocaleString());
-    setLoading(false);
-    setRefreshing(false);
   };
 
   useEffect(() => {
@@ -128,53 +195,58 @@ export default function DashboardCharts() {
         </div>
       </div>
 
+      {rateLimitWarning && (
+        <div className="mb-4 p-3 bg-yellow-900 border border-yellow-700 rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-400">⚠️</span>
+            <span className="text-yellow-200 text-sm">{rateLimitWarning}</span>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Time-Based Trends */}
         <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-lg">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Entry Volume Over Time</h3>
-            {chartsData.entry_volume?.cached !== undefined && (
-              <span className={`text-xs px-2 py-1 rounded ${
-                chartsData.entry_volume.cached
-                  ? 'bg-green-900 text-green-300'
-                  : 'bg-blue-900 text-blue-300'
-              }`}>
-                {chartsData.entry_volume.cached ? 'Cached' : 'Fresh'}
-              </span>
-            )}
+            <StatusBadge cached={chartsData.entry_volume?.cached} />
           </div>
-          <EntryVolumeChart data={chartsData.entry_volume?.data || []} />
-          {chartsData.entry_volume?.insights?.map((insight, i) => (
-            <p key={i} className="text-sm text-gray-400 mt-2">• {insight}</p>
-          ))}
-          {chartsData.entry_volume?.generated_at && (
-            <p className="text-xs text-gray-500 mt-2">
-              Generated: {new Date(chartsData.entry_volume.generated_at).toLocaleString()}
-            </p>
+          {chartsData.entry_volume?.cached === false && (!chartsData.entry_volume?.data || chartsData.entry_volume.data.length === 0) ? (
+            <NoDataState emoji="📊" />
+          ) : (
+            <>
+              <EntryVolumeChart data={chartsData.entry_volume?.data || []} />
+              {chartsData.entry_volume?.insights?.map((insight, i) => (
+                <p key={i} className="text-sm text-gray-400 mt-2">• {insight}</p>
+              ))}
+              {chartsData.entry_volume?.generated_at && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Generated: {new Date(chartsData.entry_volume.generated_at).toLocaleString()}
+                </p>
+              )}
+            </>
           )}
         </div>
 
         <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-lg">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Energy Timeline</h3>
-            {chartsData.energy_timeline?.cached !== undefined && (
-              <span className={`text-xs px-2 py-1 rounded ${
-                chartsData.energy_timeline.cached
-                  ? 'bg-green-900 text-green-300'
-                  : 'bg-blue-900 text-blue-300'
-              }`}>
-                {chartsData.energy_timeline.cached ? 'Cached' : 'Fresh'}
-              </span>
-            )}
+            <StatusBadge cached={chartsData.energy_timeline?.cached} />
           </div>
-          <EnergyTimelineChart data={chartsData.energy_timeline?.data || []} />
-          {chartsData.energy_timeline?.insights?.map((insight, i) => (
-            <p key={i} className="text-sm text-gray-400 mt-2">• {insight}</p>
-          ))}
-          {chartsData.energy_timeline?.generated_at && (
-            <p className="text-xs text-gray-500 mt-2">
-              Generated: {new Date(chartsData.energy_timeline.generated_at).toLocaleString()}
-            </p>
+          {chartsData.energy_timeline?.cached === false && (!chartsData.energy_timeline?.data || chartsData.energy_timeline.data.length === 0) ? (
+            <NoDataState emoji="📈" />
+          ) : (
+            <>
+              <EnergyTimelineChart data={chartsData.energy_timeline?.data || []} />
+              {chartsData.energy_timeline?.insights?.map((insight, i) => (
+                <p key={i} className="text-sm text-gray-400 mt-2">• {insight}</p>
+              ))}
+              {chartsData.energy_timeline?.generated_at && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Generated: {new Date(chartsData.energy_timeline.generated_at).toLocaleString()}
+                </p>
+              )}
+            </>
           )}
         </div>
 

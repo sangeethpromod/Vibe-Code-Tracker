@@ -1,7 +1,7 @@
 // app/api/chart-data/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getChartData } from '@/lib/chart-generator';
+import { getCachedChartData } from '@/lib/chart-generator';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Chart type required' }, { status: 400 });
     }
 
-    // Get chart data (from cache or generate new)
-    const chartData = await getChartData(chartType, period);
+    // Get chart data from cache only (no Gemini API calls)
+    const chartData = await getCachedChartData(chartType, period);
 
     return NextResponse.json(chartData);
 

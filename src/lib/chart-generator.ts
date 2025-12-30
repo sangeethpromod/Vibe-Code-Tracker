@@ -1,9 +1,50 @@
-// app/lib/chart-generator.ts
+// Rate limiting configuration
+const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests (30 requests per minute max)
+const MAX_RETRIES = 3;
+const RETRY_DELAY_BASE = 1000; // Base delay for retries in ms
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getSupabaseAdmin } from './supabase';
+// Helper function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Helper function to check if error is rate limit related
+const isRateLimitError = (error: any): boolean => {
+  return error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('Too Many Requests');
+};
+
+// Helper function for retry with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = MAX_RETRIES,
+  baseDelay: number = RETRY_DELAY_BASE
+): Promise<T> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      if (!isRateLimitError(error) || attempt === maxRetries) {
+        throw error;
+      }
+
+      // Extract retry delay from error if available, otherwise use exponential backoff
+      const retryDelay = error?.errorDetails?.find((detail: any) =>
+        detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
+      )?.retryDelay || `${baseDelay * Math.pow(2, attempt)}ms`;
+
+      const delayMs = typeof retryDelay === 'string'
+        ? parseFloat(retryDelay.replace('s', '')) * 1000
+        : retryDelay;
+
+      console.log(`Rate limit hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+      await delay(delayMs);
+    }
+  }
+
+  throw lastError;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateChartData(chartType: string): Promise<any> {
@@ -227,7 +268,12 @@ Return JSON in this exact format:
 
   const prompt = prompts[chartType as keyof typeof prompts] || `Generate chart data for ${chartType}`;
 
-  const result = await model.generateContent(prompt);
+  // Wrap the API call with retry logic for rate limiting
+  const result = await retryWithBackoff(async () => {
+    const result = await model.generateContent(prompt);
+    return result;
+  });
+
   const response = await result.response;
   const text = response.text();
 
@@ -413,6 +459,37 @@ export async function getChartData(chartType: string, period: string = 'weekly')
   return await generateAndStoreChartData(chartType, period);
 }
 
+// Cache-only retrieval for dashboard (no Gemini API calls)
+export async function getCachedChartData(chartType: string, period: string = 'weekly'): Promise<any> {
+  const supabase = getSupabaseAdmin();
+
+  // Only get from cache - never generate new data
+  const { data: cachedData, error } = await supabase
+    .from('chart_data')
+    .select('data, generated_at, expires_at')
+    .eq('chart_type', chartType)
+    .eq('period', period)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  if (cachedData && !error) {
+    return {
+      ...cachedData.data,
+      cached: true,
+      generated_at: cachedData.generated_at
+    };
+  }
+
+  // Return empty data if not cached (don't generate)
+  console.log(`No cached data found for ${chartType} (${period}), returning empty`);
+  return {
+    data: [],
+    insights: [],
+    cached: false,
+    message: 'No cached data available'
+  };
+}
+
 // Generate all chart data at once
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateAllCharts(period: string = 'weekly'): Promise<Record<string, any>> {
@@ -433,18 +510,25 @@ export async function generateAllCharts(period: string = 'weekly'): Promise<Reco
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results: Record<string, any> = {};
 
-  // Generate charts in parallel for better performance
-  const promises = chartTypes.map(async (chartType) => {
+  // Generate charts sequentially to respect rate limits
+  for (const chartType of chartTypes) {
     try {
-      const data = await generateAndStoreChartData(chartType, period);
+      console.log(`Generating chart: ${chartType}`);
+      const data = await retryWithBackoff(
+        () => generateAndStoreChartData(chartType, period)
+      );
       results[chartType] = data;
+
+      // Add delay between requests to respect rate limits
+      if (chartType !== chartTypes[chartTypes.length - 1]) {
+        await delay(RATE_LIMIT_DELAY);
+      }
     } catch (error) {
-      console.error(`Failed to generate ${chartType}:`, error);
+      console.error(`Failed to generate ${chartType} after retries:`, error);
       results[chartType] = { data: [], insights: [], message: 'Failed to generate' };
     }
-  });
+  }
 
-  await Promise.all(promises);
   return results;
 }
 
