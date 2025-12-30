@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { generateEntryResponse, generateFeudalResponse } from '@/lib/gemini';
 import { parseEntry } from '@/lib/telegram-parser';
-import { triggerChartUpdate } from '@/lib/chart-generator';
 
 export const runtime = "edge";
 
@@ -53,14 +52,6 @@ async function saveEntry(entry: { type: string; content: string; metadata?: Reco
     throw error;
   }
 
-  // Trigger chart update after saving entry
-  try {
-    await triggerChartUpdate();
-  } catch (chartError) {
-    console.error('Failed to trigger chart update:', chartError);
-    // Don't fail the entry save if chart update fails
-  }
-
   return data;
 }
 
@@ -104,12 +95,22 @@ export async function POST(req: NextRequest) {
     // Parse and save as entry
     const entry = parseEntry(text);
     await saveEntry(entry);
-    const response = await generateEntryResponse(entry.type, entry.content);
-    await sendTelegramMessage(chatId, response);
+    try {
+      const response = await generateEntryResponse(entry.type, entry.content);
+      await sendTelegramMessage(chatId, response);
+    } catch (error) {
+      console.error('Failed to generate entry response:', error);
+      await sendTelegramMessage(chatId, "Entry saved! I'll analyze this later.");
+    }
   } else {
     // Treat as general conversation and respond as feudal lord
-    const response = await generateFeudalResponse(text);
-    await sendTelegramMessage(chatId, response);
+    try {
+      const response = await generateFeudalResponse(text);
+      await sendTelegramMessage(chatId, response);
+    } catch (error) {
+      console.error('Failed to generate feudal response:', error);
+      await sendTelegramMessage(chatId, "എന്താ ചെയ്യുന്നു? (What are you doing?) I need a moment to think.");
+    }
   }
 
   return NextResponse.json({ ok: true });
@@ -198,12 +199,4 @@ async function saveCheckin(supabase: ReturnType<typeof getSupabaseAdmin>, data: 
     mood: data.mood,
     grateful_for: data.grateful
   });
-
-  // Trigger chart update after saving checkin
-  try {
-    await triggerChartUpdate();
-  } catch (chartError) {
-    console.error('Failed to trigger chart update:', chartError);
-    // Don't fail the checkin save if chart update fails
-  }
 }

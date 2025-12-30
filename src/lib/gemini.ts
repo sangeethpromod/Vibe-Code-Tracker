@@ -45,9 +45,22 @@ LANGUAGE & STYLE:
 END.
 `;
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  return response.text().trim();
+  // Add timeout to prevent hanging
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Gemini API timeout')), 15000)
+  );
+
+  try {
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error('Gemini API error in generateEntryResponse:', error);
+    throw error;
+  }
 }
 
 export async function generateFeudalResponse(message: string): Promise<string> {
@@ -66,9 +79,22 @@ Respond conversationally as this lord would in 1-3 sentences. Be engaging and ma
 
 Keep responses conversational and engaging, not just judgmental. This lord enjoys verbal sparring and philosophical discussions. No emoji, stay in character as a wise but arrogant feudal lord.`;
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  return response.text().trim();
+  // Add timeout to prevent hanging
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Gemini API timeout')), 15000)
+  );
+
+  try {
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error('Gemini API error in generateFeudalResponse:', error);
+    throw error;
+  }
 }
 
 export async function generateWeeklyReview(entries: Entry[]): Promise<WeeklyReviewOutput> {

@@ -7,8 +7,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // Rate limiting configuration
 const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests (30 requests per minute max)
-const MAX_RETRIES = 3;
-const RETRY_DELAY_BASE = 1000; // Base delay for retries in ms
+const MAX_RETRIES = 2; // Reduced from 3 to prevent timeouts
+const RETRY_DELAY_BASE = 2000; // Increased base delay to 2 seconds
 
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
