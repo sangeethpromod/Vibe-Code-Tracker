@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { generateEntryResponse, generateFeudalResponse } from '@/lib/gemini';
+import { generateFeudalResponse } from '@/lib/gemini';
 import { parseEntry } from '@/lib/telegram-parser';
 
 export const runtime = "edge";
@@ -92,14 +92,14 @@ export async function POST(req: NextRequest) {
   const isEntryFormat = text.includes(':') && text.split(':')[0].trim().length > 0;
 
   if (isEntryFormat) {
-    // Parse and save as entry
+    // Parse and save as entry, then respond as feudal lord
     const entry = parseEntry(text);
     await saveEntry(entry);
     try {
-      const response = await generateEntryResponse(entry.type, entry.content);
+      const response = await generateFeudalResponse(`Entry logged: ${entry.type}: ${entry.content}`);
       await sendTelegramMessage(chatId, response);
     } catch (error) {
-      console.error('Failed to generate entry response:', error);
+      console.error('Failed to generate feudal response for entry:', error);
       await sendTelegramMessage(chatId, "Entry saved! I'll analyze this later.");
     }
   } else {
