@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { generateEntryResponse, generateFeudalResponse } from '@/lib/gemini';
 import { parseEntry } from '@/lib/telegram-parser';
+import { triggerChartUpdate } from '@/lib/chart-generator';
 
 export const runtime = "edge";
 
@@ -50,6 +51,14 @@ async function saveEntry(entry: { type: string; content: string; metadata?: Reco
   if (error) {
     console.error('Supabase error:', error);
     throw error;
+  }
+
+  // Trigger chart update after saving entry
+  try {
+    await triggerChartUpdate();
+  } catch (chartError) {
+    console.error('Failed to trigger chart update:', chartError);
+    // Don't fail the entry save if chart update fails
   }
 
   return data;
@@ -189,4 +198,12 @@ async function saveCheckin(supabase: ReturnType<typeof getSupabaseAdmin>, data: 
     mood: data.mood,
     grateful_for: data.grateful
   });
+
+  // Trigger chart update after saving checkin
+  try {
+    await triggerChartUpdate();
+  } catch (chartError) {
+    console.error('Failed to trigger chart update:', chartError);
+    // Don't fail the checkin save if chart update fails
+  }
 }

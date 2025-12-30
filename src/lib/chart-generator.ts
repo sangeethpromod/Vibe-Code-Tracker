@@ -353,3 +353,108 @@ async function getChartRawData(chartType: string, supabase: any): Promise<any> {
         .limit(100);
   }
 }
+
+// Generate and store chart data in database
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function generateAndStoreChartData(chartType: string, period: string = 'weekly'): Promise<any> {
+  const supabase = getSupabaseAdmin();
+
+  // Generate the chart data
+  const chartData = await generateChartData(chartType);
+
+  // Store in database with 24-hour expiration
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 24);
+
+  const { error } = await supabase
+    .from('chart_data')
+    .upsert({
+      chart_type: chartType,
+      period,
+      data: chartData,
+      generated_at: new Date().toISOString(),
+      expires_at: expiresAt.toISOString()
+    }, {
+      onConflict: 'chart_type,period'
+    });
+
+  if (error) {
+    console.error(`Failed to store ${chartType} chart data:`, error);
+    throw error;
+  }
+
+  return chartData;
+}
+
+// Get chart data from database cache, or generate if not available/expired
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getChartData(chartType: string, period: string = 'weekly'): Promise<any> {
+  const supabase = getSupabaseAdmin();
+
+  // Try to get from cache first
+  const { data: cachedData, error } = await supabase
+    .from('chart_data')
+    .select('data, generated_at, expires_at')
+    .eq('chart_type', chartType)
+    .eq('period', period)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  if (cachedData && !error) {
+    return {
+      ...cachedData.data,
+      cached: true,
+      generated_at: cachedData.generated_at
+    };
+  }
+
+  // Generate new data if not cached or expired
+  console.log(`Generating fresh data for ${chartType} (${period})`);
+  return await generateAndStoreChartData(chartType, period);
+}
+
+// Generate all chart data at once
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function generateAllCharts(period: string = 'weekly'): Promise<Record<string, any>> {
+  const chartTypes = [
+    'entry_volume',
+    'energy_timeline',
+    'category_distribution',
+    'entry_type_pie',
+    'weekly_category_heatmap',
+    'sleep_quality',
+    'workout_frequency',
+    'avoidance_frequency',
+    'productivity_focus',
+    'financial_tracking',
+    'logging_consistency'
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const results: Record<string, any> = {};
+
+  // Generate charts in parallel for better performance
+  const promises = chartTypes.map(async (chartType) => {
+    try {
+      const data = await generateAndStoreChartData(chartType, period);
+      results[chartType] = data;
+    } catch (error) {
+      console.error(`Failed to generate ${chartType}:`, error);
+      results[chartType] = { data: [], insights: [], message: 'Failed to generate' };
+    }
+  });
+
+  await Promise.all(promises);
+  return results;
+}
+
+// Trigger chart generation when new entries are added
+export async function triggerChartUpdate(): Promise<void> {
+  try {
+    await generateAllCharts('weekly');
+    console.log('Chart data updated successfully');
+  } catch (error) {
+    console.error('Failed to update chart data:', error);
+    throw error;
+  }
+}
